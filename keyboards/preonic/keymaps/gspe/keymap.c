@@ -64,7 +64,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
  * |------+------+------+------+------+------+------+------+------+------+------+------|
  * | Tab  |   Q  |   W  |   F  |   P  |   G  |   J  |   L  |   U  |   Y  |   ;  | Del  |
  * |------+------+------+------+------+-------------+------+------+------+------+------|
- * | Esc  |   A  |   R  |   S  |   T  |   D  |   H  |   N  |   E  |   I  |   O  |  "   |
+ * | Bksp |   A  |   R  |   S  |   T  |   D  |   H  |   N  |   E  |   I  |   O  |  "   |
  * |------+------+------+------+------+------|------+------+------+------+------+------|
  * | Shift|   Z  |   X  |   C  |   V  |   B  |   K  |   M  |   ,  |   .  |   /  |Enter |
  * |------+------+------+------+------+------+------+------+------+------+------+------|
@@ -74,7 +74,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 [_COLEMAK] = LAYOUT_preonic_grid( \
   KC_GESC, KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_BSPC, \
   KC_TAB,  KC_Q,    KC_W,    KC_F,    KC_P,    KC_G,    KC_J,    KC_L,    KC_U,    KC_Y,    KC_SCLN, KC_DEL,  \
-  KC_ESC,  KC_A,    KC_R,    KC_S,    KC_T,    KC_D,    KC_H,    KC_N,    KC_E,    KC_I,    KC_O,    KC_QUOT, \
+  KC_BSPC, KC_A,    KC_R,    KC_S,    KC_T,    KC_D,    KC_H,    KC_N,    KC_E,    KC_I,    KC_O,    KC_QUOT, \
   KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_K,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH, KC_ENT,  \
   BACKLIT, KC_LCTL, KC_LALT, KC_LGUI, LOWER,   KC_SPC,  KC_SPC,  RAISE,   KC_LEFT, KC_DOWN, KC_UP,   KC_RGHT  \
 ),
@@ -213,12 +213,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
               backlight_step();
             #endif
             #ifdef __AVR__
-            PORTE &= ~(1<<6);
+            writePinLow(E6);
             #endif
           } else {
             unregister_code(KC_RSFT);
             #ifdef __AVR__
-            PORTE |= (1<<6);
+            writePinHigh(E6);
             #endif
           }
           return false;
@@ -259,41 +259,44 @@ void encoder_update_user(uint8_t index, bool clockwise) {
   }
 }
 
-void dip_update(uint8_t index, bool active) {
-  switch (index) {
-    case 0:
-      if (active) {
-        layer_on(_ADJUST);
-      } else {
-        layer_off(_ADJUST);
-      }
-      break;
-    case 1:
-      if (active) {
-        muse_mode = true;
-      } else {
-        muse_mode = false;
-        #ifdef AUDIO_ENABLE
-          stop_all_notes();
-        #endif
-      }
-   }
+void dip_switch_update_user(uint8_t index, bool active) {
+    switch (index) {
+        case 0:
+            if (active) {
+                layer_on(_ADJUST);
+            } else {
+                layer_off(_ADJUST);
+            }
+            break;
+        case 1:
+            if (active) {
+                muse_mode = true;
+            } else {
+                muse_mode = false;
+            }
+    }
 }
 
+
 void matrix_scan_user(void) {
-  #ifdef AUDIO_ENABLE
+#ifdef AUDIO_ENABLE
     if (muse_mode) {
-      if (muse_counter == 0) {
-        uint8_t muse_note = muse_offset + SCALE[muse_clock_pulse()];
-        if (muse_note != last_muse_note) {
-          stop_note(compute_freq_for_midi_note(last_muse_note));
-          play_note(compute_freq_for_midi_note(muse_note), 0xF);
-          last_muse_note = muse_note;
+        if (muse_counter == 0) {
+            uint8_t muse_note = muse_offset + SCALE[muse_clock_pulse()];
+            if (muse_note != last_muse_note) {
+                stop_note(compute_freq_for_midi_note(last_muse_note));
+                play_note(compute_freq_for_midi_note(muse_note), 0xF);
+                last_muse_note = muse_note;
+            }
         }
-      }
-      muse_counter = (muse_counter + 1) % muse_tempo;
+        muse_counter = (muse_counter + 1) % muse_tempo;
+    } else {
+        if (muse_counter) {
+            stop_all_notes();
+            muse_counter = 0;
+        }
     }
-  #endif
+#endif
 }
 
 bool music_mask_user(uint16_t keycode) {
